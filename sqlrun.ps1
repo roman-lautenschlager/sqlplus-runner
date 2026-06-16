@@ -89,7 +89,7 @@ WHENEVER SQLERROR EXIT SUCCESS
 SET LINESIZE 250
 SET PAGESIZE 0
 CONNECT $($env:SQLPLUSCONNECT)
-select replace(replace(BANNER_FULL,chr(13),' '),chr(10),' ') as BANNER_SINGLE_LINE from V`$VERSION;
+select replace(replace(BANNER_FULL,chr(13),chr(32)),chr(10),chr(32)) as BANNER_SINGLE_LINE from V`$VERSION;
 DISCONNECT;
 EXIT;
 "@ | sqlplus -S -L /nolog
@@ -171,6 +171,8 @@ REM Controls whether or not to echo commands in a script that is executed with @
 SET ECHO OFF
 
 CONNECT $($env:SQLPLUSCONNECT)
+
+ALTER SESSION SET RECYCLEBIN = OFF;
 
 ALTER SESSION DISABLE PARALLEL DML;
 ALTER SESSION DISABLE PARALLEL DDL;

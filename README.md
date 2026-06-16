@@ -46,7 +46,10 @@ export SQLPLUSCONNECT="username/password@host:port/service"
 ./sqlrun.sh  /path/to/sql/files
 
 # or
-SQLPLUSCONNECT="ADMIN/$( cat ~/.oracle/.pass )@cloud_low" ./sqlrun.sh ./sql
+BASH_ENV=.env  ./sqlrun.sh  /path/to/sql/files
+
+# or
+SQLPLUSCONNECT="ADMIN/$( cat ~/.oracle/.pass )@cloud_low"  ./sqlrun.sh  ./sql
 ```
 
 ```powershell

@@ -67,7 +67,7 @@ if [[ -d "${sql_path}" ]]; then
   # *.pks (Package source or package specification)
   # *.pkb (Package binary or package body)
   # *.pck (Combined package specification plus body)
-  if ! find "${sql_path}" \( -type f -iname '*.sql' -or -iname '*.pls' -or -iname '*.pck' -or -iname '*.pks' -or -iname '*.pkb' \) -print -quit | grep --quiet --no-messages .; then
+  if ! find "${sql_path}" -type f \( -iname '*.sql' -or -iname '*.pls' -or -iname '*.pck' -or -iname '*.pks' -or -iname '*.pkb' \) -print -quit | grep --quiet --no-messages .; then
     printf "%s%03d\t%s\n" "E" "$LINENO" "no sql files found in provided path" >&2;
     exit 1;
   fi
@@ -80,7 +80,7 @@ WHENEVER SQLERROR EXIT SUCCESS
 SET LINESIZE 250
 SET PAGESIZE 0
 CONNECT ${SQLPLUSCONNECT}
-select replace(replace(BANNER_FULL,chr(13),' '),chr(10),' ') as BANNER_SINGLE_LINE from V\$VERSION;
+select replace(replace(BANNER_FULL,chr(13),chr(32)),chr(10),chr(32)) as BANNER_SINGLE_LINE from V\$VERSION;
 DISCONNECT;
 EXIT;
 EOF
@@ -166,6 +166,8 @@ REM Controls whether or not to echo commands in a script that is executed with @
 SET ECHO OFF
 
 CONNECT ${SQLPLUSCONNECT}
+
+ALTER SESSION SET RECYCLEBIN = OFF;
 
 ALTER SESSION DISABLE PARALLEL DML;
 ALTER SESSION DISABLE PARALLEL DDL;
