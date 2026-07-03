@@ -27,7 +27,7 @@
 # connection string in a format accepted by CONNECT command
 SQLPLUSCONNECT="username/password@host:port/service"
 
-# sql substitution variables, prefix I_ is added during DEFINE
+# sql substitution variables, prefix I_ is added during run
 ORACLE_USER_NAME=MY_USER
 ORACLE_USER_TABLESPACE=DATA
 MY_PARAMETER=123
@@ -48,17 +48,27 @@ select count(*)
 
 ```sh
 # BASH
-export SQLPLUSCONNECT="username/password@host:port/service"
-./sqlrun.sh  /path/to/sql/files
-./sqlrun.sh  /path/to/single/script.sql
 
-# or
+# read connection string from .env file
+./sqlrun.sh ./sql
+
+# or set connection string for session
+export SQLPLUSCONNECT="username/password@host:port/service"
+./sqlrun.sh  /path/to/all/files
+./sqlrun.sh  /path/to/single/file.sql
+
+# or set connection string before run
 SQLPLUSCONNECT="ADMIN/$( cat ~/.oracle/.pass )@cloud_low"  ./sqlrun.sh  ./sql
 ```
 
 ```powershell
 # POWERSHELL
+
+# read connection string from .env file
+.\sqlrun.sh .\sql
+
+# or set connection string before run
 $env:SQLPLUSCONNECT="username/password@host:port/service"
-.\sqlrun.ps1 .\path\to\sql\files
-.\sqlrun.ps1 .\path\to\single\script.sql
+.\sqlrun.ps1 .\path\to\all\files
+.\sqlrun.ps1 .\path\to\single\file.sql
 ```
