@@ -1,0 +1,51 @@
+name: Lint scripts
+
+on:
+  push:
+    paths:
+      - "sqlrun.sh"
+      - "sqlrun.ps1"
+      - ".github/workflows/lint-scripts.yml"
+  pull_request:
+    paths:
+      - "sqlrun.sh"
+      - "sqlrun.ps1"
+      - ".github/workflows/lint-scripts.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: ShellCheck and PSScriptAnalyzer
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install ShellCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Run ShellCheck
+        run: |
+          shellcheck sqlrun.sh
+
+      - name: Install PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force
+
+      - name: Run PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          $results = Invoke-ScriptAnalyzer -Path ./sqlrun.ps1 -Severity Error,Warning
+          $results | Format-Table -AutoSize
+
+          if ($results) {
+            throw "PSScriptAnalyzer found issues in sqlrun.ps1"
+          }
