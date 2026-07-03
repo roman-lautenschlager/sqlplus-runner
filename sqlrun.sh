@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-sql_path="";
-
 # is $ORACLE_HOME environment path set
 if [[ -z "${ORACLE_HOME+set}" ]]; then
   printf "%s%03d\t%s\n" "W" "$LINENO" "\$ORACLE_HOME path is not set" >&2;
@@ -15,44 +13,49 @@ fi
 ## echo "exit" | sqlplus -S /nolog > /dev/null
 ## export RETURN_CODE=$?
 
+# resolve full path
+sql_path="";
+
 # at least one input parameter was provided
 if [[ $# -gt 0 ]]; then
   # read full path
-  sql_path=$( readlink -f "${1%/}" );
-  # path exist
-  if [[ -d "${sql_path}" || -f "${sql_path}" ]]; then
-    # dir contains .env file
-    env_file="${sql_path}/.env";
-    if [[ -f "${env_file}" ]]; then
-      # read each line
-      while IFS= read -r env_line || [[ -n "${env_line}" ]]; do
-        # remove Windows CR (\r) and any trailing spaces/tabs
-        #env_line=$( sed -e 's/[[:space:]]*$//' <<< "${env_line}" );
-        # Skip empty lines or lines starting with comments
-        [[ -z "${env_line}" || "${env_line}" =~ ^[[:space:]]*# ]] && continue
-        # match simple assignments VAR=value or export VAR=value
-        if [[ "$env_line" =~ ^([[:space:]]*export[[:space:]]+)?([A-Za-z_][A-Za-z_0-9]*)[[:space:]]*=[[:space:]]*(.*)$ ]]; then
-          var_name="${BASH_REMATCH[2]}"
-          var_value="${BASH_REMATCH[3]}"
-          # Trim trailing whitespace from the captured value (e.g., "staging    " -> "staging")
-          var_value="${var_value%"${var_value##*[![:space:]]}"}"
-          # Strip leading/trailing quotes if the value was wrapped in them
-          var_value="${var_value#\'}"; var_value="${var_value%\'}"
-          var_value="${var_value#\"}"; var_value="${var_value%\"}"
-          # declare -p checks if the variable exists in the environment/shell
-          if ! declare -p "${var_name}" &>/dev/null; then
-            export "$var_name"="$var_value";
-          fi
-        fi
-      done < "${env_file}";
-    fi
+  sql_path="${1%/}";
+  if command -v realpath &>/dev/null; then
+    sql_path=$(realpath "${1%/}")
   else
-    printf "%s%03d\t%s\n" "E" "$LINENO" "${1} - path not found" >&2;
-    exit 1;
+    sql_path=$(readlink -f "${1%/}")
   fi
-else
-  printf "%s%03d\t%s\n" "E" "$LINENO" "provide a path to sql file or dir with sql files" >&2;
+fi
+
+# path exist
+if ! [[ -d "${sql_path}" || -f "${sql_path}" ]]; then
+  printf "%s%03d\t%s\n" "E" "$LINENO" "${sql_path} - path not found" >&2;
   exit 1
+fi
+
+# dir contains .env file
+env_dir=$( if [[ -d "${sql_path}" ]]; then echo "${sql_path}"; else dirname "${sql_path}"; fi );
+env_file="${env_dir}/.env";
+if [[ -f "${env_file}" ]]; then
+  # read each line
+  while IFS= read -r env_line || [[ -n "${env_line}" ]]; do
+    # Skip empty lines or lines starting with comments
+    [[ -z "${env_line}" || "${env_line}" =~ ^[[:space:]]*# ]] && continue
+    # match simple assignments VAR=value or export VAR=value
+    if [[ "$env_line" =~ ^([[:space:]]*export[[:space:]]+)?([A-Za-z_][A-Za-z_0-9]*)[[:space:]]*=[[:space:]]*(.*)$ ]]; then
+      var_name="${BASH_REMATCH[2]}"
+      var_value="${BASH_REMATCH[3]}"
+      # Trim trailing whitespace from the captured value (e.g., "staging    " -> "staging")
+      var_value="${var_value%"${var_value##*[![:space:]]}"}"
+      # Strip leading/trailing quotes if the value was wrapped in them
+      var_value="${var_value#\'}"; var_value="${var_value%\'}"
+      var_value="${var_value#\"}"; var_value="${var_value%\"}"
+      # declare -p checks if the variable exists in the environment/shell
+      if ! declare -p "${var_name}" &>/dev/null; then
+        export "$var_name"="$var_value";
+      fi
+    fi
+  done < "${env_file}";
 fi
 
 # is environment variable $SQLPLUSCONNECT set and not empty
@@ -85,7 +88,7 @@ DISCONNECT;
 EXIT;
 EOF
 );
-if [[ -z "${connection_test}" || "$connection_test" == *"ORA-"* ]]; then
+if [[ -z "${connection_test}" || "$connection_test" == *"ORA-"* || "$connection_test" == *"SP2-"* ]]; then
   printf "%s%03d\t%s\n" "E" "$LINENO" "could not connect" >&2;
   printf "%s\n" "${connection_test}" >&2;
   exit 1;
@@ -93,14 +96,14 @@ fi
 
 # DEFINE ENVIRONMENT VARIABLES
 SQL_DEFINE="";
-while IFS='=' read -r env_key env_value; do
+#while IFS='=' read -r env_key env_value; do
+while IFS='=' read -r -d '' env_key env_value; do
   env_key="${env_key//[^a-zA-Z0-9_]/}";
-  if [[ ${#env_key} -gt 1 ]]; then
+  if [[ ${#env_key} -gt 0 ]]; then
     env_value="${env_value//\'/\'\'}";
     SQL_DEFINE=$( printf "%s\n%s" "${SQL_DEFINE}" "DEFINE I_${env_key^^} = '${env_value}';" ); # +="@@${SQLFILE};"$'\n';
   fi
-done < <( env | grep --no-messages -v 'SQLPLUSCONNECT' );
-# TODO: or grep '^SQL_'
+done < <( env -0 | grep --no-messages -z -v '^SQLPLUSCONNECT=' );
 
 # FIND FILES
 SQL_FILE="";
@@ -110,12 +113,23 @@ fi
 if [[ -d "${sql_path}" ]]; then
   while read -r -d $'\0' SQLFILE; do
     if [[ -f "${SQLFILE}" ]]; then
-      SQL_FILE=$( printf "%s\n%s" "${SQL_FILE}" "@@${SQLFILE}" ); # +="@@${SQLFILE};"$'\n';
+      SQL_FILE=$( printf "%s\n%s;" "${SQL_FILE}" "@@${SQLFILE}" ); # +="@@${SQLFILE};"$'\n';
     fi;
-  done < <(find "${sql_path}" \( -type f -iname '*.sql' -or -iname '*.pls' -or -iname '*.pck' -or -iname '*.pks' -or -iname '*.pkb' \) -print0 | sort --ignore-case --numeric-sort --zero-terminated);
+  done < <(find "${sql_path}" -not -path '*/.*' \( -type f -iname '*.sql' -or -iname '*.pls' -or -iname '*.pck' -or -iname '*.pks' -or -iname '*.pkb' \) -print0 | sort --ignore-case --version-sort --zero-terminated);
+  # done < <(find "${sql_path}" -not -path '*/.*' \( -type f -iname '*.sql' -or -iname '*.pls' -or -iname '*.pck' -or -iname '*.pks' -or -iname '*.pkb' \) -print0 | sort --ignore-case --numeric-sort --zero-terminated);
 fi
 
-# TODO: if $SQLPLUS_LOG_PATH variable is present, SPOOL into it instead of terminal ?
+# TEST
+for arg in "$@"; do
+  if [[ "$arg" == "--dry-run" ]]; then
+    echo "SQLPLUSCONNECT: ${SQLPLUSCONNECT}";
+    echo;
+    echo "${SQL_DEFINE}";
+    echo;
+    echo "${SQL_FILE}";
+    exit 0;
+  fi
+done
 
 # RUN
 sqlplus -S -L /nolog <<EOF

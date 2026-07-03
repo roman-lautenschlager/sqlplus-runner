@@ -2,11 +2,16 @@
 
 ## Wrapper for Oracle Database SQL*Plus
 
-- to use with connection details stored in environment variable
-- to run all *.sql files from provided path in order
-- to use any environment variable in sql as substitution variables
+- to use with connection details stored in environment variable (by default only not yet set variables are loaded from .env file, to overwrite already set variables, source .env file before calling the script to load all)
+- to run all *.sql files from provided path in order (when a single file is passed .env is loaded from the directory containing the file)
+- to use any environment variable in sql as substitution variables (all available env vars become available in sqlplus call as SQL defines with the I_ prefix)
 
-### Store connection and other input variables in .env file
+### Prerequisites
+- Oracle Instant Client
+- sqlplus in $PATH
+- BASH or PowerShell
+
+### RTFM
 
 [SQL*Plus command summary](https://docs.oracle.com/en/database/oracle/oracle-database/19/sqpug/SQL-Plus-command-summary.html)
 
@@ -16,9 +21,9 @@
 
 [Using substitution variables](https://docs.oracle.com/en/database/oracle/oracle-database/26/sqpug/using-substitution-variables-sqlplus.html)
 
-```bash
-# .env
+### .env
 
+```bash
 # connection string in a format accepted by CONNECT command
 SQLPLUSCONNECT="username/password@host:port/service"
 
@@ -28,9 +33,10 @@ ORACLE_USER_TABLESPACE=DATA
 MY_PARAMETER=123
 ```
 
-### Use substitution variables in sql
+### .sql
 
 ```sql
+-- use substitution variables in sql
 select count(*)
   into v_tablespace_count
   from dba_tablespaces
@@ -38,15 +44,13 @@ select count(*)
 -- etc...
 ```
 
-### Run
+### .run
 
 ```sh
 # BASH
 export SQLPLUSCONNECT="username/password@host:port/service"
 ./sqlrun.sh  /path/to/sql/files
-
-# or
-BASH_ENV=.env  ./sqlrun.sh  /path/to/sql/files
+./sqlrun.sh  /path/to/single/script.sql
 
 # or
 SQLPLUSCONNECT="ADMIN/$( cat ~/.oracle/.pass )@cloud_low"  ./sqlrun.sh  ./sql
@@ -55,5 +59,6 @@ SQLPLUSCONNECT="ADMIN/$( cat ~/.oracle/.pass )@cloud_low"  ./sqlrun.sh  ./sql
 ```powershell
 # POWERSHELL
 $env:SQLPLUSCONNECT="username/password@host:port/service"
-.\sqlrun.ps1 .\sql\files
+.\sqlrun.ps1 .\path\to\sql\files
+.\sqlrun.ps1 .\path\to\single\script.sql
 ```

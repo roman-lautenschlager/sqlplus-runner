@@ -1,5 +1,6 @@
 #!/usr/bin/env pwsh
 
+[CmdletBinding(SupportsShouldProcess)]
 [CmdletBinding()]
 Param(
     [Parameter(Mandatory, Position = 0)]
@@ -15,35 +16,36 @@ function Write-Diag {
     [Console]::Error.WriteLine(("{0}{1:D3}`t{2}" -f $Level, $line, $Message))
 }
 
-$sql_path = ""
-
 # is $ORACLE_HOME environment path set
 if (-not $env:ORACLE_HOME) {
-    Write-Diag "W" '$ORACLE_HOME path is not set'
+    Write-Diag "W" "`$ORACLE_HOME path is not set"
 }
 
 # is sqlplus command available
 if (-not (Get-Command sqlplus -ErrorAction SilentlyContinue)) {
-    Write-Diag "E" 'sqlplus is NOT installed or not in $PATH'
+    Write-Diag "E" "sqlplus - NOT found"
     exit 1
 }
 
 # resolve full path
+$sql_path = $Path
+
 try {
     $sql_path = (Resolve-Path $Path -ErrorAction Stop).Path
 } catch {
-    Write-Diag "E" "$Path - path not found"
+    Write-Diag "E" "$Path - path NOT found"
     exit 1
 }
 
-# path must be a file or directory
-if (-not ((Test-Path $sql_path -PathType Container) -or (Test-Path $sql_path -PathType Leaf))) {
-    Write-Diag "E" "$Path - path not found"
-    exit 1
-}
+# # path must be a file or directory
+# if (-not ((Test-Path $sql_path -PathType Container) -or (Test-Path $sql_path -PathType Leaf))) {
+#     Write-Diag "E" "$Path - path not found"
+#     exit 1
+# }
 
-# load .env file if present (only meaningful when sql_path is a directory)
-$env_file = Join-Path $sql_path ".env"
+# load .env file if present
+$env_dir = if (Test-Path $sql_path -PathType Container) { $sql_path } else { Split-Path $sql_path }
+$env_file = Join-Path $env_dir ".env"
 if (Test-Path $env_file -PathType Leaf) {
     foreach ($env_line in [System.IO.File]::ReadAllLines($env_file)) {
         # skip empty lines and comments
@@ -94,7 +96,7 @@ DISCONNECT;
 EXIT;
 "@ | sqlplus -S -L /nolog
 
-if ([string]::IsNullOrWhiteSpace($connection_test) -or $connection_test -match 'ORA-') {
+if ([string]::IsNullOrWhiteSpace($connection_test) -or $connection_test -match 'ORA-' -or $connection_test -match 'SP2-') {
     Write-Diag "E" "could not connect"
     [Console]::Error.WriteLine($connection_test)
     exit 1
@@ -104,7 +106,7 @@ if ([string]::IsNullOrWhiteSpace($connection_test) -or $connection_test -match '
 $SQL_DEFINE = ""
 Get-ChildItem Env: | Where-Object { $_.Name -ne 'SQLPLUSCONNECT' } | ForEach-Object {
     $env_key = $_.Name -replace '[^a-zA-Z0-9_]', ''
-    if ($env_key.Length -gt 1) {
+    if ($env_key.Length -gt 0) {
         $env_value = $_.Value -replace "'", "''"
         $SQL_DEFINE += "`nDEFINE I_$($env_key.ToUpper()) = '$env_value';"
     }
@@ -117,9 +119,17 @@ if (Test-Path $sql_path -PathType Leaf) {
 }
 if (Test-Path $sql_path -PathType Container) {
     Get-ChildItem -Path $sql_path -Recurse -File |
-        Where-Object { $_.Extension -imatch '\.(sql|pls|pck|pks|pkb)$' } |
-        Sort-Object FullName |
-        ForEach-Object { $SQL_FILE += "`n@@$($_.FullName)" }
+        Where-Object { $_.Attributes -notmatch 'Hidden' -and $_.Extension -imatch '\.(sql|pls|pck|pks|pkb)$' } |
+        Sort-Object { [regex]::Replace($_.FullName, '\d+', { $args[0].Value.PadLeft(20) }) } | # FullName |
+        ForEach-Object { $SQL_FILE += "`n@@$($_.FullName);" }
+}
+
+# TEST
+if ( -not $PSCmdlet.ShouldProcess("$sql_path")) {
+    Write-Host "SQLPLUSCONNECT: $env:SQLPLUSCONNECT"
+    Write-Host "${SQL_DEFINE}"
+    Write-Host "${SQL_FILE}"
+    exit 0
 }
 
 # RUN
@@ -187,3 +197,5 @@ DISCONNECT;
 EXIT;
 
 "@ | sqlplus -S -L /nolog
+
+exit $LASTEXITCODE
