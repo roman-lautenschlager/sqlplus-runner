@@ -1,7 +1,6 @@
 #!/usr/bin/env pwsh
 
 [CmdletBinding(SupportsShouldProcess)]
-[CmdletBinding()]
 Param(
     [Parameter(Mandatory, Position = 0)]
     [string] $Path
@@ -76,7 +75,7 @@ if ([string]::IsNullOrEmpty($env:SQLPLUSCONNECT)) {
 # if directory, verify it contains SQL files
 if (Test-Path $sql_path -PathType Container) {
     $has_sql = Get-ChildItem -Path $sql_path -Recurse -File |
-        Where-Object { $_.Extension -imatch '\.(sql|pls|pck|pks|pkb)$' } |
+        Where-Object { $_.Attributes -notmatch 'Hidden' -and $_.Extension -imatch '\.(sql|pls|pck|pks|pkb)$' } |
         Select-Object -First 1
     if (-not $has_sql) {
         Write-Diag "E" "no sql files found in provided path"
@@ -84,25 +83,7 @@ if (Test-Path $sql_path -PathType Container) {
     }
 }
 
-# TEST CONNECTION
-$connection_test = @"
-WHENEVER OSERROR EXIT SUCCESS
-WHENEVER SQLERROR EXIT SUCCESS
-SET LINESIZE 250
-SET PAGESIZE 0
-CONNECT $($env:SQLPLUSCONNECT)
-select replace(replace(BANNER_FULL,chr(13),chr(32)),chr(10),chr(32)) as BANNER_SINGLE_LINE from V`$VERSION;
-DISCONNECT;
-EXIT;
-"@ | sqlplus -S -L /nolog
-
-if ([string]::IsNullOrWhiteSpace($connection_test) -or $connection_test -match 'ORA-' -or $connection_test -match 'SP2-') {
-    Write-Diag "E" "could not connect"
-    [Console]::Error.WriteLine($connection_test)
-    exit 1
-}
-
-# DEFINE ENVIRONMENT VARIABLES — expose all env vars as SQL*Plus substitution variables
+# DEFINE ENVIRONMENT VARIABLES - expose all env vars as SQL*Plus substitution variables
 $SQL_DEFINE = ""
 Get-ChildItem Env: | Where-Object { $_.Name -ne 'SQLPLUSCONNECT' } | ForEach-Object {
     $env_key = $_.Name -replace '[^a-zA-Z0-9_]', ''
@@ -126,10 +107,33 @@ if (Test-Path $sql_path -PathType Container) {
 
 # TEST
 if ( -not $PSCmdlet.ShouldProcess("$sql_path")) {
-    Write-Host "SQLPLUSCONNECT: $env:SQLPLUSCONNECT"
-    Write-Host "${SQL_DEFINE}"
-    Write-Host "${SQL_FILE}"
+    #Write-Host "SQLPLUSCONNECT: $env:SQLPLUSCONNECT"
+    if (-not [string]::IsNullOrWhiteSpace($env:SQLPLUSCONNECT)) {
+      Write-Output "SQLPLUSCONNECT is set"
+    } else {
+      Write-Output "SQLPLUSCONNECT is NOT set"
+    }
+    Write-Output "${SQL_DEFINE}"
+    Write-Output "${SQL_FILE}"
     exit 0
+}
+
+# TEST CONNECTION
+$connection_test = @"
+WHENEVER OSERROR EXIT SUCCESS
+WHENEVER SQLERROR EXIT SUCCESS
+SET LINESIZE 250
+SET PAGESIZE 0
+CONNECT $($env:SQLPLUSCONNECT)
+select replace(replace(BANNER_FULL,chr(13),chr(32)),chr(10),chr(32)) as BANNER_SINGLE_LINE from V`$VERSION;
+DISCONNECT;
+EXIT;
+"@ | sqlplus -S -L /nolog
+
+if ([string]::IsNullOrWhiteSpace($connection_test) -or $connection_test -match 'ORA-' -or $connection_test -match 'SP2-') {
+    Write-Diag "E" "could not connect"
+    [Console]::Error.WriteLine($connection_test)
+    exit 1
 }
 
 # RUN

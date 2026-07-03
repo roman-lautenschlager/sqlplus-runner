@@ -70,28 +70,10 @@ if [[ -d "${sql_path}" ]]; then
   # *.pks (Package source or package specification)
   # *.pkb (Package binary or package body)
   # *.pck (Combined package specification plus body)
-  if ! find "${sql_path}" -type f \( -iname '*.sql' -or -iname '*.pls' -or -iname '*.pck' -or -iname '*.pks' -or -iname '*.pkb' \) -print -quit | grep --quiet --no-messages .; then
+  if ! find "${sql_path}" \( -type f -not -path '*/.*' -iname '*.sql' -or -iname '*.pls' -or -iname '*.pck' -or -iname '*.pks' -or -iname '*.pkb' \) -print -quit | grep --quiet --no-messages .; then
     printf "%s%03d\t%s\n" "E" "$LINENO" "no sql files found in provided path" >&2;
     exit 1;
   fi
-fi
-
-# TEST CONNECTION
-connection_test=$( sqlplus -S -L /nolog <<EOF
-WHENEVER OSERROR EXIT SUCCESS
-WHENEVER SQLERROR EXIT SUCCESS
-SET LINESIZE 250
-SET PAGESIZE 0
-CONNECT ${SQLPLUSCONNECT}
-select replace(replace(BANNER_FULL,chr(13),chr(32)),chr(10),chr(32)) as BANNER_SINGLE_LINE from V\$VERSION;
-DISCONNECT;
-EXIT;
-EOF
-);
-if [[ -z "${connection_test}" || "$connection_test" == *"ORA-"* || "$connection_test" == *"SP2-"* ]]; then
-  printf "%s%03d\t%s\n" "E" "$LINENO" "could not connect" >&2;
-  printf "%s\n" "${connection_test}" >&2;
-  exit 1;
 fi
 
 # DEFINE ENVIRONMENT VARIABLES
@@ -115,21 +97,41 @@ if [[ -d "${sql_path}" ]]; then
     if [[ -f "${SQLFILE}" ]]; then
       SQL_FILE=$( printf "%s\n%s;" "${SQL_FILE}" "@@${SQLFILE}" ); # +="@@${SQLFILE};"$'\n';
     fi;
-  done < <(find "${sql_path}" -not -path '*/.*' \( -type f -iname '*.sql' -or -iname '*.pls' -or -iname '*.pck' -or -iname '*.pks' -or -iname '*.pkb' \) -print0 | sort --ignore-case --version-sort --zero-terminated);
+  done < <(find "${sql_path}" \( -type f -not -path '*/.*' -iname '*.sql' -or -iname '*.pls' -or -iname '*.pck' -or -iname '*.pks' -or -iname '*.pkb' \) -print0 | sort --ignore-case --version-sort --zero-terminated);
   # done < <(find "${sql_path}" -not -path '*/.*' \( -type f -iname '*.sql' -or -iname '*.pls' -or -iname '*.pck' -or -iname '*.pks' -or -iname '*.pkb' \) -print0 | sort --ignore-case --numeric-sort --zero-terminated);
 fi
 
 # TEST
 for arg in "$@"; do
   if [[ "$arg" == "--dry-run" ]]; then
-    echo "SQLPLUSCONNECT: ${SQLPLUSCONNECT}";
-    echo;
+    if [[ -n "${SQLPLUSCONNECT+x}" && -n "${SQLPLUSCONNECT}" ]]; then
+      echo "SQLPLUSCONNECT is set";
+    else
+      echo "SQLPLUSCONNECT is NOT set";
+    fi
     echo "${SQL_DEFINE}";
-    echo;
     echo "${SQL_FILE}";
     exit 0;
   fi
 done
+
+# TEST CONNECTION
+connection_test=$( sqlplus -S -L /nolog <<EOF
+WHENEVER OSERROR EXIT SUCCESS
+WHENEVER SQLERROR EXIT SUCCESS
+SET LINESIZE 250
+SET PAGESIZE 0
+CONNECT ${SQLPLUSCONNECT}
+select replace(replace(BANNER_FULL,chr(13),chr(32)),chr(10),chr(32)) as BANNER_SINGLE_LINE from V\$VERSION;
+DISCONNECT;
+EXIT;
+EOF
+);
+if [[ -z "${connection_test}" || "$connection_test" == *"ORA-"* || "$connection_test" == *"SP2-"* ]]; then
+  printf "%s%03d\t%s\n" "E" "$LINENO" "could not connect" >&2;
+  printf "%s\n" "${connection_test}" >&2;
+  exit 1;
+fi
 
 # RUN
 sqlplus -S -L /nolog <<EOF
