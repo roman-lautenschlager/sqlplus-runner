@@ -3,13 +3,13 @@ name: Lint scripts
 on:
   push:
     paths:
-      - "sqlrun.sh"
-      - "sqlrun.ps1"
+      - "sqlplusrun.sh"
+      - "sqlplusrun.ps1"
       - ".github/workflows/lint-scripts.yml"
   pull_request:
     paths:
-      - "sqlrun.sh"
-      - "sqlrun.ps1"
+      - "sqlplusrun.sh"
+      - "sqlplusrun.ps1"
       - ".github/workflows/lint-scripts.yml"
   workflow_dispatch:
 
@@ -32,7 +32,7 @@ jobs:
 
       - name: Run ShellCheck
         run: |
-          shellcheck sqlrun.sh
+          shellcheck sqlplusrun.sh
 
       - name: Install PSScriptAnalyzer
         shell: pwsh
@@ -43,9 +43,9 @@ jobs:
       - name: Run PSScriptAnalyzer
         shell: pwsh
         run: |
-          $results = Invoke-ScriptAnalyzer -Path ./sqlrun.ps1 -Severity Error,Warning
+          $results = Invoke-ScriptAnalyzer -Path ./sqlplusrun.ps1 -Severity Error,Warning
           $results | Format-Table -AutoSize
 
           if ($results) {
-            throw "PSScriptAnalyzer found issues in sqlrun.ps1"
+            throw "PSScriptAnalyzer found issues in sqlplusrun.ps1"
           }

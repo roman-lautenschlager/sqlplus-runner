@@ -50,25 +50,26 @@ select count(*)
 # BASH
 
 # read connection string from .env file
-./sqlrun.sh ./sql
+./sqlplusrun.sh ./sql
 
 # or set connection string for session
 export SQLPLUSCONNECT="username/password@host:port/service"
-./sqlrun.sh  /path/to/all/files
-./sqlrun.sh  /path/to/single/file.sql
+./sqlplusrun.sh  ./path/to/all/files
+./sqlplusrun.sh  ./path/to/single/file.sql
 
 # or set connection string before run
-SQLPLUSCONNECT="ADMIN/$( cat ~/.oracle/.pass )@cloud_low"  ./sqlrun.sh  ./sql
+SQLPLUSCONNECT="ADMIN/$( cat ~/.oracle/.pass )@cloud_low"  ./sqlplusrun.sh  ./sql
 ```
 
 ```powershell
 # POWERSHELL
 
 # read connection string from .env file
-.\sqlrun.sh .\sql
+.\sqlplusrun.sh .\sql
 
 # or set connection string before run
 $env:SQLPLUSCONNECT="username/password@host:port/service"
-.\sqlrun.ps1 .\path\to\all\files
-.\sqlrun.ps1 .\path\to\single\file.sql
+.\sqlplusrun.ps1 .\path\to\all\files
+.\sqlplusrun.ps1 .\path\to\single\file.sql
 ```
+
