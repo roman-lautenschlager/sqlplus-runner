@@ -126,7 +126,7 @@ REM  Controls whether or not to echo commands in a script that is executed with 
 SET ECHO OFF
 
 REM  Displays the elapsed execution time of each SQL statement or PL/SQL block.
-SET TIMING ON
+SET TIMING OFF
 
 REM  Disables SQL*Plus substitution variables using & and &&.
 SET DEFINE OFF

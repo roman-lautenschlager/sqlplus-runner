@@ -8,13 +8,13 @@ Param(
 
 # 1. ORACLE_HOME
 if ( -not $env:ORACLE_HOME ) {
-    Write-Host "W1`t `$ORACLE_HOME path is not set"
+    Write-Output "W1`t `$ORACLE_HOME path is not set"
 }
 
 
 # 2. SQLPLUS
 if (-not (Get-Command sqlplus -ErrorAction SilentlyContinue)) {
-    Write-Host "E2`t sqlplus NOT found"
+    Write-Output "E2`t sqlplus NOT found"
     exit 1
 }
 
@@ -24,7 +24,7 @@ $SQL_PATH = ""
 try {
     $SQL_PATH = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).Path
 } catch {
-    Write-Host "E3`t path NOT found"
+    Write-Output "E3`t path NOT found"
     exit 1
 }
 
@@ -35,8 +35,8 @@ if ( -not [string]::IsNullOrEmpty($env:SQLPLUSCONNECT) ) {
     $CONNECTION_STRING = $env:SQLPLUSCONNECT
 }
 else {
-    Write-Host "E4`t `$env:SQLPLUSCONNECT is not set, will not be able to connect"
-    Write-Host "Usage: `$env:SQLPLUSCONNECT=`"<connection>`"; .\sqlplusrun.ps1 <path>"
+    Write-Output "E4`t `$env:SQLPLUSCONNECT is not set, will not be able to connect"
+    Write-Output "Usage: `$env:SQLPLUSCONNECT=`"<connection>`"; .\sqlplusrun.ps1 <path>"
     exit 1
 }
 
@@ -80,7 +80,7 @@ if (Test-Path -LiteralPath $SQL_PATH -PathType Container) {
             $SQL_FILE += "`n@@`"$($_.FullName)`""
         }
     if ($SQL_FILE.Length -eq 0) {
-      Write-Host "W6`t no files found"
+      Write-Output "W6`t no files found"
       exit 1
     }
 }
@@ -135,7 +135,7 @@ REM  Controls whether or not to echo commands in a script that is executed with 
 SET ECHO OFF
 
 REM  Displays the elapsed execution time of each SQL statement or PL/SQL block.
-SET TIMING ON
+SET TIMING OFF
 
 REM  Disables SQL*Plus substitution variables using & and &&.
 SET DEFINE OFF
